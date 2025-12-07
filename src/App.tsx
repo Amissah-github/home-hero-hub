@@ -12,6 +12,17 @@ import ProviderDashboard from "./pages/ProviderDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import BecomeProvider from "./pages/BecomeProvider";
 import NotFound from "./pages/NotFound";
+import About from "./pages/About";
+import Careers from "./pages/Careers";
+import Press from "./pages/Press";
+import Blog from "./pages/Blog";
+import HelpCenter from "./pages/HelpCenter";
+import Safety from "./pages/Safety";
+import Guidelines from "./pages/Guidelines";
+import Contact from "./pages/Contact";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
+import Cookies from "./pages/Cookies";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +41,17 @@ const App = () => (
           <Route path="/provider/dashboard" element={<ProviderDashboard />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/become-provider" element={<BecomeProvider />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/careers" element={<Careers />} />
+          <Route path="/press" element={<Press />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/help" element={<HelpCenter />} />
+          <Route path="/safety" element={<Safety />} />
+          <Route path="/guidelines" element={<Guidelines />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/cookies" element={<Cookies />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
