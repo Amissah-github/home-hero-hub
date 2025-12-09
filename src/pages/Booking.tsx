@@ -154,8 +154,16 @@ export default function Booking() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!date || !time || !address) {
-      toast.error("Please fill in all required fields");
+    if (!date) {
+      toast.error("Please select a date");
+      return;
+    }
+    if (!time) {
+      toast.error("Please select a time slot");
+      return;
+    }
+    if (!address.trim()) {
+      toast.error("Please enter your service address");
       return;
     }
 
