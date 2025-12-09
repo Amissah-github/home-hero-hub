@@ -82,8 +82,39 @@ export default function ProviderOnboarding() {
     }));
   };
 
+  const validateStep = (step: number): boolean => {
+    switch (step) {
+      case 1:
+        if (!formData.address.trim() || !formData.city.trim()) {
+          toast.error("Please fill in all required fields");
+          return false;
+        }
+        return true;
+      case 2:
+        if (!formData.category || !formData.hourlyRate || !formData.yearsExperience) {
+          toast.error("Please fill in all required fields");
+          return false;
+        }
+        return true;
+      case 3:
+        if (!formData.idDocument || !formData.selfie) {
+          toast.error("Please upload both ID document and selfie");
+          return false;
+        }
+        return true;
+      case 4:
+        if (formData.availableDays.length === 0) {
+          toast.error("Please select at least one available day");
+          return false;
+        }
+        return true;
+      default:
+        return true;
+    }
+  };
+
   const nextStep = () => {
-    if (currentStep < 4) {
+    if (validateStep(currentStep) && currentStep < 4) {
       setCurrentStep((prev) => prev + 1);
     }
   };
@@ -95,6 +126,8 @@ export default function ProviderOnboarding() {
   };
 
   const handleSubmit = async () => {
+    if (!validateStep(4)) return;
+    
     setIsLoading(true);
     
     // Simulate submission
