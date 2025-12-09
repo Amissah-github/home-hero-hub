@@ -11,6 +11,7 @@ import UserDashboard from "./pages/UserDashboard";
 import ProviderDashboard from "./pages/ProviderDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import BecomeProvider from "./pages/BecomeProvider";
+import ProviderOnboarding from "./pages/ProviderOnboarding";
 import NotFound from "./pages/NotFound";
 import About from "./pages/About";
 import Careers from "./pages/Careers";
@@ -41,6 +42,7 @@ const App = () => (
           <Route path="/provider/dashboard" element={<ProviderDashboard />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/become-provider" element={<BecomeProvider />} />
+          <Route path="/provider/onboarding" element={<ProviderOnboarding />} />
           <Route path="/about" element={<About />} />
           <Route path="/careers" element={<Careers />} />
           <Route path="/press" element={<Press />} />
