@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { ProviderCard } from "@/components/providers/ProviderCard";
@@ -125,6 +125,7 @@ const categories = [
 
 export default function Services() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [search, setSearch] = useState(searchParams.get("q") || "");
   const [category, setCategory] = useState(searchParams.get("category") || "all");
   const [priceRange, setPriceRange] = useState([0, 200]);
@@ -150,8 +151,7 @@ export default function Services() {
   });
 
   const handleBook = (id: string) => {
-    console.log("Booking provider:", id);
-    // Navigate to booking page
+    navigate(`/booking/${id}`);
   };
 
   const clearFilters = () => {

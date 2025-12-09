@@ -298,27 +298,37 @@ export default function ProviderOnboarding() {
                       Take a clear selfie holding your ID next to your face
                     </p>
                     <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
-                      <input
-                        type="file"
-                        id="selfie"
-                        accept="image/*"
-                        capture="user"
-                        className="hidden"
-                        onChange={(e) => handleFileChange("selfie", e.target.files?.[0] || null)}
-                      />
-                      <label htmlFor="selfie" className="cursor-pointer">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full gap-2"
+                        onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = 'image/*';
+                          input.capture = 'user';
+                          input.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0] || null;
+                            handleFileChange("selfie", file);
+                          };
+                          input.click();
+                        }}
+                      >
                         {formData.selfie ? (
-                          <div className="flex items-center justify-center gap-2 text-success">
-                            <CheckCircle className="h-5 w-5" />
-                            <span>{formData.selfie.name}</span>
-                          </div>
+                          <>
+                            <CheckCircle className="h-5 w-5 text-success" />
+                            <span className="text-success">{formData.selfie.name}</span>
+                          </>
                         ) : (
-                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                            <Camera className="h-8 w-8" />
-                            <span>Click to take or upload selfie</span>
-                          </div>
+                          <>
+                            <Camera className="h-5 w-5" />
+                            <span>Take Selfie with Camera</span>
+                          </>
                         )}
-                      </label>
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Camera access required
+                      </p>
                     </div>
                   </div>
                 </div>
