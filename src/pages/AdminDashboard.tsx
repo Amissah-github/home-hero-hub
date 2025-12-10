@@ -5,6 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -36,9 +44,11 @@ import {
   BarChart3,
   Loader2,
   ScanFace,
+  RefreshCw,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { usePaystack } from "@/hooks/usePaystack";
 
 interface PendingProvider {
   id: string;
@@ -514,9 +524,9 @@ export default function AdminDashboard() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle>Booking Management</CardTitle>
+                    <CardTitle>Booking Management & Refunds</CardTitle>
                     <CardDescription>
-                      Monitor and manage all platform bookings
+                      Monitor bookings and process refunds for disputed services
                     </CardDescription>
                   </div>
                   <div className="relative w-64">
@@ -530,9 +540,7 @@ export default function AdminDashboard() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">
-                    Booking data will be displayed here once bookings are created.
-                  </p>
+                  <RefundManager />
                 </CardContent>
               </Card>
             </TabsContent>

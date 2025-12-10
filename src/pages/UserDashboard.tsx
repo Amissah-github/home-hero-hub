@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
@@ -19,9 +19,13 @@ import {
   User,
   Settings,
   CreditCard,
+  Loader2,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { usePaystack } from "@/hooks/usePaystack";
+import { toast } from "sonner";
 
-// Mock bookings data
+// Mock bookings data (will be replaced with real data when auth is connected)
 const mockBookings = [
   {
     id: "1",
@@ -35,8 +39,11 @@ const mockBookings = [
     time: "10:00 AM",
     duration: "3 hours",
     status: "upcoming",
+    payment_status: "paid",
     address: "123 Main St, Apt 4B",
     price: 105,
+    customer_completed: false,
+    provider_completed: false,
   },
   {
     id: "2",
@@ -50,8 +57,11 @@ const mockBookings = [
     time: "2:00 PM",
     duration: "1 hour",
     status: "in-progress",
+    payment_status: "paid",
     address: "456 Oak Ave",
     price: 45,
+    customer_completed: false,
+    provider_completed: true,
   },
   {
     id: "3",
@@ -65,9 +75,12 @@ const mockBookings = [
     time: "6:00 PM",
     duration: "2 hours",
     status: "completed",
+    payment_status: "released",
     address: "789 Pine Rd",
     price: 170,
     rating: 5,
+    customer_completed: true,
+    provider_completed: true,
   },
 ];
 
@@ -78,12 +91,47 @@ const statusColors = {
   cancelled: "destructive",
 } as const;
 
+const paymentStatusColors = {
+  pending: "secondary",
+  paid: "info",
+  released: "success",
+  refunded: "destructive",
+} as const;
+
 export default function UserDashboard() {
   const [activeTab, setActiveTab] = useState("bookings");
+  const [bookings, setBookings] = useState(mockBookings);
+  const [searchParams] = useSearchParams();
+  const { markComplete, verifyPayment, isLoading } = usePaystack();
 
-  const upcomingBookings = mockBookings.filter((b) => b.status === "upcoming");
-  const inProgressBookings = mockBookings.filter((b) => b.status === "in-progress");
-  const pastBookings = mockBookings.filter((b) => b.status === "completed");
+  // Check for payment callback
+  useEffect(() => {
+    const paymentStatus = searchParams.get("payment");
+    const reference = searchParams.get("reference");
+
+    if (paymentStatus === "success" && reference) {
+      verifyPayment(reference).then((result) => {
+        if (result.success) {
+          toast.success("Payment confirmed! Your booking is now confirmed.");
+        }
+      });
+    }
+  }, [searchParams]);
+
+  const upcomingBookings = bookings.filter((b) => b.status === "upcoming");
+  const inProgressBookings = bookings.filter((b) => b.status === "in-progress");
+  const pastBookings = bookings.filter((b) => b.status === "completed");
+
+  const handleMarkComplete = async (bookingId: string) => {
+    const result = await markComplete(bookingId, "customer");
+    if (result.success) {
+      setBookings((prev) =>
+        prev.map((b) =>
+          b.id === bookingId ? { ...b, customer_completed: true } : b
+        )
+      );
+    }
+  };
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -202,6 +250,9 @@ export default function UserDashboard() {
                             </div>
                             <div className="flex flex-wrap gap-2">
                               <Badge variant="warning">Live Tracking</Badge>
+                              {booking.provider_completed && !booking.customer_completed && (
+                                <Badge variant="info">Provider marked complete</Badge>
+                              )}
                               <Button variant="outline" size="sm" className="gap-1">
                                 <Phone className="h-3 w-3" />
                                 Call
@@ -221,12 +272,34 @@ export default function UserDashboard() {
                             </div>
                           </div>
                           <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
-                            <span className="text-sm text-muted-foreground">
-                              Started at {booking.time}
-                            </span>
-                            <Button variant="success" size="sm">
-                              Mark as Completed
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">
+                                Started at {booking.time}
+                              </span>
+                              <Badge variant={paymentStatusColors[booking.payment_status as keyof typeof paymentStatusColors] || "secondary"}>
+                                Payment: {booking.payment_status}
+                              </Badge>
+                            </div>
+                            {booking.customer_completed ? (
+                              <Badge variant="success" className="gap-1">
+                                <CheckCircle className="h-3 w-3" />
+                                You marked complete
+                              </Badge>
+                            ) : (
+                              <Button 
+                                variant="success" 
+                                size="sm"
+                                onClick={() => handleMarkComplete(booking.id)}
+                                disabled={isLoading}
+                              >
+                                {isLoading ? (
+                                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                ) : (
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                )}
+                                Mark as Completed
+                              </Button>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
@@ -269,6 +342,9 @@ export default function UserDashboard() {
                             </div>
                             <div className="flex items-center gap-3">
                               <Badge variant="info">Upcoming</Badge>
+                              <Badge variant={paymentStatusColors[booking.payment_status as keyof typeof paymentStatusColors] || "secondary"}>
+                                {booking.payment_status === "paid" ? "Paid" : "Pending"}
+                              </Badge>
                               <p className="font-semibold">${booking.price}</p>
                               <Button variant="outline" size="sm">
                                 View Details
@@ -330,6 +406,9 @@ export default function UserDashboard() {
                           </div>
                           <div className="flex items-center gap-3">
                             <Badge variant="success">Completed</Badge>
+                            <Badge variant={paymentStatusColors[booking.payment_status as keyof typeof paymentStatusColors] || "secondary"}>
+                              {booking.payment_status}
+                            </Badge>
                             <p className="font-semibold">${booking.price}</p>
                             <Button variant="outline" size="sm">
                               Book Again
@@ -362,15 +441,28 @@ export default function UserDashboard() {
             <TabsContent value="payments">
               <Card>
                 <CardHeader>
-                  <CardTitle>Payment Methods</CardTitle>
+                  <CardTitle>Payment History</CardTitle>
                   <CardDescription>
-                    Manage your payment methods and view transaction history
+                    View your payment history and transaction details
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">
-                    Payment settings would go here. Connect to a payment provider to enable payments.
-                  </p>
+                  <div className="space-y-4">
+                    {bookings.filter(b => b.payment_status !== "pending").map((booking) => (
+                      <div key={booking.id} className="flex items-center justify-between border-b border-border pb-4">
+                        <div>
+                          <p className="font-medium">{booking.provider.service}</p>
+                          <p className="text-sm text-muted-foreground">{booking.date}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">${booking.price}</p>
+                          <Badge variant={paymentStatusColors[booking.payment_status as keyof typeof paymentStatusColors] || "secondary"}>
+                            {booking.payment_status}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

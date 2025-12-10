@@ -23,13 +23,23 @@ export type Database = {
           city: string | null
           completed_at: string | null
           created_at: string
+          customer_completed: boolean | null
           customer_id: string
           duration_hours: number
           id: string
           latitude: number | null
           longitude: number | null
           notes: string | null
+          payment_status: string | null
+          paystack_access_code: string | null
+          paystack_reference: string | null
+          platform_fee_amount: number | null
+          provider_completed: boolean | null
           provider_id: string
+          provider_payout_amount: number | null
+          refund_amount: number | null
+          refund_reason: string | null
+          refunded_at: string | null
           scheduled_date: string
           scheduled_time: string
           status: Database["public"]["Enums"]["booking_status"] | null
@@ -45,13 +55,23 @@ export type Database = {
           city?: string | null
           completed_at?: string | null
           created_at?: string
+          customer_completed?: boolean | null
           customer_id: string
           duration_hours?: number
           id?: string
           latitude?: number | null
           longitude?: number | null
           notes?: string | null
+          payment_status?: string | null
+          paystack_access_code?: string | null
+          paystack_reference?: string | null
+          platform_fee_amount?: number | null
+          provider_completed?: boolean | null
           provider_id: string
+          provider_payout_amount?: number | null
+          refund_amount?: number | null
+          refund_reason?: string | null
+          refunded_at?: string | null
           scheduled_date: string
           scheduled_time: string
           status?: Database["public"]["Enums"]["booking_status"] | null
@@ -67,13 +87,23 @@ export type Database = {
           city?: string | null
           completed_at?: string | null
           created_at?: string
+          customer_completed?: boolean | null
           customer_id?: string
           duration_hours?: number
           id?: string
           latitude?: number | null
           longitude?: number | null
           notes?: string | null
+          payment_status?: string | null
+          paystack_access_code?: string | null
+          paystack_reference?: string | null
+          platform_fee_amount?: number | null
+          provider_completed?: boolean | null
           provider_id?: string
+          provider_payout_amount?: number | null
+          refund_amount?: number | null
+          refund_reason?: string | null
+          refunded_at?: string | null
           scheduled_date?: string
           scheduled_time?: string
           status?: Database["public"]["Enums"]["booking_status"] | null
