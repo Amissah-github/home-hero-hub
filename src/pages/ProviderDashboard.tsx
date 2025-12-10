@@ -17,10 +17,11 @@ import {
   XCircle,
   Navigation,
   User,
-  Settings,
   TrendingUp,
   Bell,
+  Loader2,
 } from "lucide-react";
+import { usePaystack } from "@/hooks/usePaystack";
 
 // Mock jobs data
 const mockJobs = [
@@ -36,9 +37,12 @@ const mockJobs = [
     time: "10:00 AM",
     duration: "3 hours",
     status: "pending",
+    payment_status: "paid",
     address: "123 Main St, Apt 4B",
     price: 105,
     distance: "2.3 km",
+    customer_completed: false,
+    provider_completed: false,
   },
   {
     id: "2",
@@ -51,10 +55,13 @@ const mockJobs = [
     date: "2024-12-10",
     time: "2:00 PM",
     duration: "2 hours",
-    status: "accepted",
+    status: "in-progress",
+    payment_status: "paid",
     address: "456 Oak Ave",
     price: 70,
     distance: "1.5 km",
+    customer_completed: true,
+    provider_completed: false,
   },
   {
     id: "3",
@@ -68,10 +75,13 @@ const mockJobs = [
     time: "9:00 AM",
     duration: "4 hours",
     status: "completed",
+    payment_status: "released",
     address: "789 Pine Rd",
     price: 140,
     distance: "3.1 km",
     rating: 5,
+    customer_completed: true,
+    provider_completed: true,
   },
 ];
 
@@ -85,14 +95,23 @@ const weeklySchedule = [
   { day: "Sunday", available: false, hours: "Off" },
 ];
 
+const paymentStatusColors = {
+  pending: "secondary",
+  paid: "info",
+  released: "success",
+  refunded: "destructive",
+} as const;
+
 export default function ProviderDashboard() {
   const [activeTab, setActiveTab] = useState("jobs");
   const [isAvailable, setIsAvailable] = useState(true);
   const [schedule, setSchedule] = useState(weeklySchedule);
+  const [jobs, setJobs] = useState(mockJobs);
+  const { markComplete, isLoading } = usePaystack();
 
-  const pendingJobs = mockJobs.filter((j) => j.status === "pending");
-  const acceptedJobs = mockJobs.filter((j) => j.status === "accepted");
-  const completedJobs = mockJobs.filter((j) => j.status === "completed");
+  const pendingJobs = jobs.filter((j) => j.status === "pending");
+  const inProgressJobs = jobs.filter((j) => j.status === "in-progress" || j.status === "accepted");
+  const completedJobs = jobs.filter((j) => j.status === "completed");
 
   const toggleDayAvailability = (dayIndex: number) => {
     setSchedule((prev) =>
@@ -100,6 +119,17 @@ export default function ProviderDashboard() {
         i === dayIndex ? { ...day, available: !day.available } : day
       )
     );
+  };
+
+  const handleMarkComplete = async (jobId: string) => {
+    const result = await markComplete(jobId, "provider");
+    if (result.success) {
+      setJobs((prev) =>
+        prev.map((j) =>
+          j.id === jobId ? { ...j, provider_completed: true } : j
+        )
+      );
+    }
   };
 
   // Mock earnings
@@ -155,8 +185,8 @@ export default function ProviderDashboard() {
                   <Calendar className="h-6 w-6 text-info" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{acceptedJobs.length}</p>
-                  <p className="text-sm text-muted-foreground">Today's Jobs</p>
+                  <p className="text-2xl font-bold">{inProgressJobs.length}</p>
+                  <p className="text-sm text-muted-foreground">Active Jobs</p>
                 </div>
               </CardContent>
             </Card>
@@ -246,6 +276,9 @@ export default function ProviderDashboard() {
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
+                              <Badge variant={paymentStatusColors[job.payment_status as keyof typeof paymentStatusColors] || "secondary"}>
+                                {job.payment_status === "paid" ? "Payment Held" : job.payment_status}
+                              </Badge>
                               <p className="text-xl font-bold text-foreground">${job.price}</p>
                               <Button variant="outline" size="sm" className="gap-1">
                                 <XCircle className="h-4 w-4" />
@@ -264,13 +297,13 @@ export default function ProviderDashboard() {
                 </div>
               )}
 
-              {/* Today's Jobs */}
+              {/* Active Jobs */}
               <div>
-                <h2 className="mb-4 text-lg font-semibold">Today's Schedule</h2>
-                {acceptedJobs.length > 0 ? (
+                <h2 className="mb-4 text-lg font-semibold">Active Jobs</h2>
+                {inProgressJobs.length > 0 ? (
                   <div className="space-y-4">
-                    {acceptedJobs.map((job) => (
-                      <Card key={job.id}>
+                    {inProgressJobs.map((job) => (
+                      <Card key={job.id} className="border-info/50 bg-info/5">
                         <CardContent className="p-4">
                           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                             <div className="flex items-center gap-4">
@@ -296,18 +329,49 @@ export default function ProviderDashboard() {
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                              <Badge variant="info">Confirmed</Badge>
+                            <div className="flex flex-wrap items-center gap-3">
+                              <Badge variant={paymentStatusColors[job.payment_status as keyof typeof paymentStatusColors] || "secondary"}>
+                                {job.payment_status === "paid" ? "Payment Held" : job.payment_status}
+                              </Badge>
+                              {job.customer_completed && !job.provider_completed && (
+                                <Badge variant="info">Customer marked complete</Badge>
+                              )}
                               <p className="font-semibold">${job.price}</p>
                               <Button variant="outline" size="sm" className="gap-1">
                                 <Navigation className="h-4 w-4" />
                                 Navigate
                               </Button>
-                              <Button variant="success" size="sm">
-                                Start Job
-                              </Button>
+                              {job.provider_completed ? (
+                                <Badge variant="success" className="gap-1">
+                                  <CheckCircle className="h-3 w-3" />
+                                  You marked complete
+                                </Badge>
+                              ) : (
+                                <Button 
+                                  variant="success" 
+                                  size="sm"
+                                  onClick={() => handleMarkComplete(job.id)}
+                                  disabled={isLoading}
+                                  className="gap-1"
+                                >
+                                  {isLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <CheckCircle className="h-4 w-4" />
+                                  )}
+                                  Mark Complete
+                                </Button>
+                              )}
                             </div>
                           </div>
+                          {job.customer_completed && job.provider_completed && (
+                            <div className="mt-4 pt-4 border-t border-border">
+                              <Badge variant="success" className="gap-1">
+                                <CheckCircle className="h-3 w-3" />
+                                Both parties confirmed - Payment will be released
+                              </Badge>
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     ))}
@@ -316,7 +380,7 @@ export default function ProviderDashboard() {
                   <Card>
                     <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                       <Calendar className="h-12 w-12 text-muted-foreground/50" />
-                      <h3 className="mt-4 font-semibold">No jobs scheduled today</h3>
+                      <h3 className="mt-4 font-semibold">No active jobs</h3>
                       <p className="mt-1 text-sm text-muted-foreground">
                         Check back for new job requests
                       </p>
@@ -363,7 +427,12 @@ export default function ProviderDashboard() {
                           </div>
                           <div className="flex items-center gap-3">
                             <Badge variant="success">Completed</Badge>
-                            <p className="font-semibold text-success">+${job.price}</p>
+                            <Badge variant={paymentStatusColors[job.payment_status as keyof typeof paymentStatusColors] || "secondary"}>
+                              {job.payment_status}
+                            </Badge>
+                            <p className="font-semibold text-success">
+                              +${Math.floor(job.price * 0.9)} <span className="text-xs text-muted-foreground">(90%)</span>
+                            </p>
                           </div>
                         </div>
                       </CardContent>
@@ -417,6 +486,7 @@ export default function ProviderDashboard() {
                 <Card>
                   <CardHeader>
                     <CardTitle>Earnings Summary</CardTitle>
+                    <CardDescription>Your earnings after platform fee (10%)</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="flex items-center justify-between">
@@ -432,6 +502,9 @@ export default function ProviderDashboard() {
                       <span className="text-2xl font-bold">{totalJobs}</span>
                     </div>
                     <div className="border-t border-border pt-4">
+                      <p className="text-sm text-muted-foreground mb-2">
+                        You receive 90% of each booking. Payments are released after both you and the customer mark the job complete.
+                      </p>
                       <Button className="w-full">View Full Report</Button>
                     </div>
                   </CardContent>
@@ -446,11 +519,11 @@ export default function ProviderDashboard() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-muted-foreground">
-                      Connect a payment method to receive earnings. Payments are
-                      processed automatically after job completion.
+                      Connect a bank account to receive earnings. Payments are
+                      processed automatically after both parties confirm job completion.
                     </p>
                     <Button variant="outline" className="mt-4 w-full">
-                      Add Payment Method
+                      Add Bank Account
                     </Button>
                   </CardContent>
                 </Card>

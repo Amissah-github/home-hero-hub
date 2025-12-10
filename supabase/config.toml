@@ -2,3 +2,15 @@ project_id = "ssomawbyyrunomzkchns"
 
 [functions.verify-face]
 verify_jwt = true
+
+[functions.initiate-payment]
+verify_jwt = false
+
+[functions.verify-payment]
+verify_jwt = false
+
+[functions.release-payment]
+verify_jwt = true
+
+[functions.process-refund]
+verify_jwt = true
