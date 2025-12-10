@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,10 +14,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import {
   Users,
   Briefcase,
   DollarSign,
-  TrendingUp,
   CheckCircle,
   XCircle,
   Eye,
@@ -26,83 +34,262 @@ import {
   AlertTriangle,
   Calendar,
   BarChart3,
+  Loader2,
+  ScanFace,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
-// Mock data
-const pendingProviders = [
-  {
-    id: "1",
-    name: "Alex Martinez",
-    email: "alex@example.com",
-    service: "Home Cleaning",
-    submittedAt: "2024-12-05",
-    documents: ["ID", "Certification", "Background Check"],
-    status: "pending",
-  },
-  {
-    id: "2",
-    name: "Sarah Lee",
-    email: "sarah@example.com",
-    service: "Personal Chef",
-    submittedAt: "2024-12-04",
-    documents: ["ID", "Food Safety Cert"],
-    status: "pending",
-  },
-];
+interface PendingProvider {
+  id: string;
+  user_id: string;
+  bio: string | null;
+  hourly_rate: number;
+  years_experience: number | null;
+  id_document_url: string | null;
+  selfie_url: string | null;
+  verification_status: string | null;
+  created_at: string;
+  category_id: string;
+  profile: {
+    full_name: string | null;
+    email: string;
+    phone: string | null;
+    city: string | null;
+  } | null;
+  category: {
+    name: string;
+  } | null;
+}
 
-const recentBookings = [
-  {
-    id: "1",
-    customer: "John Smith",
-    provider: "Maria Santos",
-    service: "Home Cleaning",
-    date: "2024-12-10",
-    amount: 105,
-    status: "confirmed",
-  },
-  {
-    id: "2",
-    customer: "Emily Brown",
-    provider: "James Wilson",
-    service: "Barber Service",
-    date: "2024-12-10",
-    amount: 45,
-    status: "in-progress",
-  },
-  {
-    id: "3",
-    customer: "Michael Davis",
-    provider: "Lisa Chen",
-    service: "Personal Chef",
-    date: "2024-12-08",
-    amount: 170,
-    status: "completed",
-  },
-];
-
-const reportedIssues = [
-  {
-    id: "1",
-    reporter: "John Smith",
-    against: "Provider X",
-    type: "Suspicious Behavior",
-    date: "2024-12-08",
-    status: "open",
-  },
-];
+interface VerificationResult {
+  match: boolean;
+  confidence: string;
+  reason: string;
+  idFaceDetected: boolean;
+  selfieFaceDetected: boolean;
+}
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [searchTerm, setSearchTerm] = useState("");
+  const [pendingProviders, setPendingProviders] = useState<PendingProvider[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedProvider, setSelectedProvider] = useState<PendingProvider | null>(null);
+  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Mock stats
-  const stats = {
-    totalUsers: 2450,
-    totalProviders: 892,
-    activeBookings: 156,
-    revenue: 45600,
-    pendingApprovals: pendingProviders.length,
-    openIssues: reportedIssues.length,
+  // Stats
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    totalProviders: 0,
+    activeBookings: 0,
+    revenue: 0,
+    pendingApprovals: 0,
+    openIssues: 0,
+  });
+
+  useEffect(() => {
+    fetchPendingProviders();
+    fetchStats();
+  }, []);
+
+  const fetchPendingProviders = async () => {
+    try {
+      // First get pending providers
+      const { data: providersData, error: providersError } = await supabase
+        .from("providers")
+        .select(`
+          *,
+          category:service_categories(name)
+        `)
+        .in("verification_status", ["pending", "under_review"])
+        .order("created_at", { ascending: false });
+
+      if (providersError) throw providersError;
+
+      // Then fetch profiles for each provider
+      if (providersData && providersData.length > 0) {
+        const userIds = providersData.map(p => p.user_id);
+        const { data: profilesData, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, full_name, email, phone, city")
+          .in("id", userIds);
+
+        if (profilesError) throw profilesError;
+
+        // Map profiles to providers
+        const providersWithProfiles = providersData.map(provider => ({
+          ...provider,
+          profile: profilesData?.find(p => p.id === provider.user_id) || null
+        }));
+
+        setPendingProviders(providersWithProfiles as PendingProvider[]);
+      } else {
+        setPendingProviders([]);
+      }
+    } catch (error) {
+      console.error("Error fetching pending providers:", error);
+      toast.error("Failed to load pending providers");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      // Fetch counts
+      const [profilesResult, providersResult, bookingsResult] = await Promise.all([
+        supabase.from("profiles").select("id", { count: "exact", head: true }),
+        supabase.from("providers").select("id", { count: "exact", head: true }).eq("verification_status", "approved"),
+        supabase.from("bookings").select("id, total_amount", { count: "exact" }).in("status", ["confirmed", "in_progress"]),
+      ]);
+
+      const pendingCount = pendingProviders.length;
+
+      setStats({
+        totalUsers: profilesResult.count || 0,
+        totalProviders: providersResult.count || 0,
+        activeBookings: bookingsResult.count || 0,
+        revenue: bookingsResult.data?.reduce((sum, b) => sum + (b.total_amount || 0), 0) || 0,
+        pendingApprovals: pendingCount,
+        openIssues: 0, // Placeholder for now
+      });
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    }
+  };
+
+  const openReviewDialog = (provider: PendingProvider) => {
+    setSelectedProvider(provider);
+    setVerificationResult(null);
+    setRejectionReason("");
+    setIsReviewDialogOpen(true);
+  };
+
+  const verifyFaces = async () => {
+    if (!selectedProvider?.id_document_url || !selectedProvider?.selfie_url) {
+      toast.error("Provider is missing verification documents");
+      return;
+    }
+
+    setIsVerifying(true);
+    setVerificationResult(null);
+
+    try {
+      // Get public URLs for the images
+      const { data: idDocData } = supabase.storage
+        .from("verification-documents")
+        .getPublicUrl(selectedProvider.id_document_url);
+
+      const { data: selfieData } = supabase.storage
+        .from("verification-documents")
+        .getPublicUrl(selectedProvider.selfie_url);
+
+      const { data, error } = await supabase.functions.invoke("verify-face", {
+        body: {
+          providerId: selectedProvider.id,
+          idDocumentUrl: idDocData.publicUrl,
+          selfieUrl: selfieData.publicUrl,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.verification) {
+        setVerificationResult(data.verification);
+        if (data.verification.match) {
+          toast.success("Face verification passed!");
+        } else {
+          toast.warning("Face verification failed - faces do not match");
+        }
+      }
+    } catch (error) {
+      console.error("Face verification error:", error);
+      toast.error("Failed to verify faces. Please try again.");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const approveProvider = async () => {
+    if (!selectedProvider) return;
+
+    // Check if face verification passed
+    if (!verificationResult?.match) {
+      toast.error("Please complete face verification before approving");
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const { error } = await supabase
+        .from("providers")
+        .update({
+          verification_status: "approved",
+          verification_notes: `Approved. Face verification: ${verificationResult.confidence} confidence - ${verificationResult.reason}`,
+        })
+        .eq("id", selectedProvider.id);
+
+      if (error) throw error;
+
+      // Add provider role
+      const { error: roleError } = await supabase.from("user_roles").insert({
+        user_id: selectedProvider.user_id,
+        role: "provider",
+      });
+
+      if (roleError && !roleError.message.includes("duplicate")) {
+        console.error("Role assignment error:", roleError);
+      }
+
+      toast.success("Provider approved successfully!");
+      setIsReviewDialogOpen(false);
+      fetchPendingProviders();
+      fetchStats();
+    } catch (error) {
+      console.error("Approval error:", error);
+      toast.error("Failed to approve provider");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const rejectProvider = async () => {
+    if (!selectedProvider) return;
+
+    if (!rejectionReason.trim()) {
+      toast.error("Please provide a rejection reason");
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const { error } = await supabase
+        .from("providers")
+        .update({
+          verification_status: "rejected",
+          verification_notes: rejectionReason,
+        })
+        .eq("id", selectedProvider.id);
+
+      if (error) throw error;
+
+      toast.success("Provider rejected");
+      setIsReviewDialogOpen(false);
+      fetchPendingProviders();
+      fetchStats();
+    } catch (error) {
+      console.error("Rejection error:", error);
+      toast.error("Failed to reject provider");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -170,7 +357,7 @@ export default function AdminDashboard() {
                   <Shield className="h-5 w-5 text-warning" />
                 </div>
                 <div>
-                  <p className="text-xl font-bold">{stats.pendingApprovals}</p>
+                  <p className="text-xl font-bold">{pendingProviders.length}</p>
                   <p className="text-xs text-muted-foreground">Pending Approvals</p>
                 </div>
               </CardContent>
@@ -198,9 +385,9 @@ export default function AdminDashboard() {
               <TabsTrigger value="approvals" className="gap-2">
                 <Shield className="h-4 w-4" />
                 Provider Approvals
-                {stats.pendingApprovals > 0 && (
+                {pendingProviders.length > 0 && (
                   <Badge variant="warning" className="ml-1">
-                    {stats.pendingApprovals}
+                    {pendingProviders.length}
                   </Badge>
                 )}
               </TabsTrigger>
@@ -215,11 +402,6 @@ export default function AdminDashboard() {
               <TabsTrigger value="issues" className="gap-2">
                 <AlertTriangle className="h-4 w-4" />
                 Issues
-                {stats.openIssues > 0 && (
-                  <Badge variant="destructive" className="ml-1">
-                    {stats.openIssues}
-                  </Badge>
-                )}
               </TabsTrigger>
             </TabsList>
 
@@ -252,52 +434,6 @@ export default function AdminDashboard() {
                     </div>
                   </CardContent>
                 </Card>
-
-                <Card className="lg:col-span-2">
-                  <CardHeader>
-                    <CardTitle>Recent Activity</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Customer</TableHead>
-                          <TableHead>Provider</TableHead>
-                          <TableHead>Service</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {recentBookings.map((booking) => (
-                          <TableRow key={booking.id}>
-                            <TableCell className="font-medium">
-                              {booking.customer}
-                            </TableCell>
-                            <TableCell>{booking.provider}</TableCell>
-                            <TableCell>{booking.service}</TableCell>
-                            <TableCell>{booking.date}</TableCell>
-                            <TableCell>${booking.amount}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  booking.status === "completed"
-                                    ? "success"
-                                    : booking.status === "in-progress"
-                                    ? "warning"
-                                    : "info"
-                                }
-                              >
-                                {booking.status}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
               </div>
             </TabsContent>
 
@@ -306,11 +442,15 @@ export default function AdminDashboard() {
                 <CardHeader>
                   <CardTitle>Provider Approval Queue</CardTitle>
                   <CardDescription>
-                    Review and approve new provider applications
+                    Review and approve new provider applications with AI-powered face verification
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {pendingProviders.length > 0 ? (
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  ) : pendingProviders.length > 0 ? (
                     <div className="space-y-4">
                       {pendingProviders.map((provider) => (
                         <div
@@ -318,38 +458,40 @@ export default function AdminDashboard() {
                           className="flex flex-col gap-4 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
                         >
                           <div>
-                            <p className="font-semibold">{provider.name}</p>
+                            <p className="font-semibold">
+                              {provider.profile?.full_name || "Unknown"}
+                            </p>
                             <p className="text-sm text-muted-foreground">
-                              {provider.email}
+                              {provider.profile?.email}
                             </p>
                             <p className="mt-1 text-sm">
                               <span className="font-medium">Service:</span>{" "}
-                              {provider.service}
+                              {provider.category?.name || "Unknown"}
+                            </p>
+                            <p className="text-sm">
+                              <span className="font-medium">Rate:</span> ${provider.hourly_rate}/hr
                             </p>
                             <div className="mt-2 flex flex-wrap gap-1">
-                              {provider.documents.map((doc) => (
-                                <Badge key={doc} variant="secondary">
-                                  {doc}
-                                </Badge>
-                              ))}
+                              <Badge variant={provider.id_document_url ? "success" : "destructive"}>
+                                {provider.id_document_url ? "ID Uploaded" : "No ID"}
+                              </Badge>
+                              <Badge variant={provider.selfie_url ? "success" : "destructive"}>
+                                {provider.selfie_url ? "Selfie Uploaded" : "No Selfie"}
+                              </Badge>
+                              <Badge variant="secondary">
+                                {provider.verification_status}
+                              </Badge>
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <Button variant="outline" size="sm" className="gap-1">
-                              <Eye className="h-4 w-4" />
-                              Review
-                            </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              className="gap-1 text-destructive"
+                              className="gap-1"
+                              onClick={() => openReviewDialog(provider)}
                             >
-                              <XCircle className="h-4 w-4" />
-                              Reject
-                            </Button>
-                            <Button variant="success" size="sm" className="gap-1">
-                              <CheckCircle className="h-4 w-4" />
-                              Approve
+                              <Eye className="h-4 w-4" />
+                              Review
                             </Button>
                           </div>
                         </div>
@@ -388,52 +530,9 @@ export default function AdminDashboard() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>ID</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Provider</TableHead>
-                        <TableHead>Service</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {recentBookings.map((booking) => (
-                        <TableRow key={booking.id}>
-                          <TableCell className="font-mono text-xs">
-                            #{booking.id}
-                          </TableCell>
-                          <TableCell>{booking.customer}</TableCell>
-                          <TableCell>{booking.provider}</TableCell>
-                          <TableCell>{booking.service}</TableCell>
-                          <TableCell>{booking.date}</TableCell>
-                          <TableCell>${booking.amount}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                booking.status === "completed"
-                                  ? "success"
-                                  : booking.status === "in-progress"
-                                  ? "warning"
-                                  : "info"
-                              }
-                            >
-                              {booking.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  <p className="text-muted-foreground">
+                    Booking data will be displayed here once bookings are created.
+                  </p>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -448,8 +547,7 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground">
-                    User management interface would go here. Connect to a backend
-                    to enable full user management capabilities.
+                    User management interface would go here.
                   </p>
                 </CardContent>
               </Card>
@@ -460,61 +558,187 @@ export default function AdminDashboard() {
                 <CardHeader>
                   <CardTitle>Reported Issues</CardTitle>
                   <CardDescription>
-                    Handle customer complaints and safety reports
+                    Handle user reports and platform issues
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {reportedIssues.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Reporter</TableHead>
-                          <TableHead>Against</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {reportedIssues.map((issue) => (
-                          <TableRow key={issue.id}>
-                            <TableCell>{issue.reporter}</TableCell>
-                            <TableCell>{issue.against}</TableCell>
-                            <TableCell>{issue.type}</TableCell>
-                            <TableCell>{issue.date}</TableCell>
-                            <TableCell>
-                              <Badge variant="warning">{issue.status}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Button variant="outline" size="sm">
-                                  Investigate
-                                </Button>
-                                <Button variant="ghost" size="sm">
-                                  Dismiss
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <CheckCircle className="h-12 w-12 text-success" />
-                      <h3 className="mt-4 font-semibold">No open issues</h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        All reported issues have been resolved
-                      </p>
-                    </div>
-                  )}
+                  <p className="text-muted-foreground">
+                    No reported issues at this time.
+                  </p>
                 </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
         </div>
       </main>
+
+      {/* Review Dialog */}
+      <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Review Provider Application</DialogTitle>
+            <DialogDescription>
+              Verify the provider's identity by comparing their ID document with their selfie
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedProvider && (
+            <div className="space-y-6">
+              {/* Provider Info */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <h4 className="font-semibold mb-2">Provider Details</h4>
+                  <div className="space-y-1 text-sm">
+                    <p><span className="text-muted-foreground">Name:</span> {selectedProvider.profile?.full_name}</p>
+                    <p><span className="text-muted-foreground">Email:</span> {selectedProvider.profile?.email}</p>
+                    <p><span className="text-muted-foreground">Phone:</span> {selectedProvider.profile?.phone || "N/A"}</p>
+                    <p><span className="text-muted-foreground">City:</span> {selectedProvider.profile?.city || "N/A"}</p>
+                    <p><span className="text-muted-foreground">Service:</span> {selectedProvider.category?.name}</p>
+                    <p><span className="text-muted-foreground">Rate:</span> ${selectedProvider.hourly_rate}/hr</p>
+                    <p><span className="text-muted-foreground">Experience:</span> {selectedProvider.years_experience || 0} years</p>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-semibold mb-2">Bio</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedProvider.bio || "No bio provided"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Verification Images */}
+              <div>
+                <h4 className="font-semibold mb-3">Verification Documents</h4>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">ID Document</p>
+                    {selectedProvider.id_document_url ? (
+                      <div className="relative aspect-video rounded-lg border overflow-hidden bg-muted">
+                        <img
+                          src={supabase.storage.from("verification-documents").getPublicUrl(selectedProvider.id_document_url).data.publicUrl}
+                          alt="ID Document"
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center aspect-video rounded-lg border bg-muted">
+                        <p className="text-sm text-muted-foreground">No ID uploaded</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Selfie</p>
+                    {selectedProvider.selfie_url ? (
+                      <div className="relative aspect-video rounded-lg border overflow-hidden bg-muted">
+                        <img
+                          src={supabase.storage.from("verification-documents").getPublicUrl(selectedProvider.selfie_url).data.publicUrl}
+                          alt="Selfie"
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center aspect-video rounded-lg border bg-muted">
+                        <p className="text-sm text-muted-foreground">No selfie uploaded</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Face Verification */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold">AI Face Verification</h4>
+                  <Button
+                    onClick={verifyFaces}
+                    disabled={isVerifying || !selectedProvider.id_document_url || !selectedProvider.selfie_url}
+                    className="gap-2"
+                  >
+                    {isVerifying ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      <>
+                        <ScanFace className="h-4 w-4" />
+                        Verify Faces
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {verificationResult && (
+                  <div className={`rounded-lg p-4 ${verificationResult.match ? "bg-success/10 border border-success/20" : "bg-destructive/10 border border-destructive/20"}`}>
+                    <div className="flex items-start gap-3">
+                      {verificationResult.match ? (
+                        <CheckCircle className="h-5 w-5 text-success mt-0.5" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-destructive mt-0.5" />
+                      )}
+                      <div>
+                        <p className="font-medium">
+                          {verificationResult.match ? "Faces Match" : "Faces Do Not Match"}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Confidence: <Badge variant={verificationResult.confidence === "high" ? "success" : verificationResult.confidence === "medium" ? "warning" : "destructive"}>{verificationResult.confidence}</Badge>
+                        </p>
+                        <p className="text-sm mt-2">{verificationResult.reason}</p>
+                        <div className="flex gap-2 mt-2">
+                          <Badge variant={verificationResult.idFaceDetected ? "success" : "destructive"}>
+                            ID Face: {verificationResult.idFaceDetected ? "Detected" : "Not Detected"}
+                          </Badge>
+                          <Badge variant={verificationResult.selfieFaceDetected ? "success" : "destructive"}>
+                            Selfie Face: {verificationResult.selfieFaceDetected ? "Detected" : "Not Detected"}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Rejection Reason */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Rejection Reason (if rejecting)</label>
+                <Textarea
+                  placeholder="Enter reason for rejection..."
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsReviewDialogOpen(false)}
+              disabled={isProcessing}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={rejectProvider}
+              disabled={isProcessing || !rejectionReason.trim()}
+              className="gap-1"
+            >
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+              Reject
+            </Button>
+            <Button
+              variant="success"
+              onClick={approveProvider}
+              disabled={isProcessing || !verificationResult?.match}
+              className="gap-1"
+            >
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+              Approve
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
