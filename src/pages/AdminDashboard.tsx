@@ -48,7 +48,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { usePaystack } from "@/hooks/usePaystack";
+import { RefundManager } from "@/components/admin/RefundManager";
 
 interface PendingProvider {
   id: string;
