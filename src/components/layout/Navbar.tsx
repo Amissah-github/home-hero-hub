@@ -20,9 +20,9 @@ export function Navbar() {
       <div className="container flex h-16 items-center justify-between px-4">
         <Link to="/" className="flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg gradient-primary">
-            <Home className="h-5 w-5 text-primary-foreground" />
+            <span className="text-lg font-bold text-primary-foreground">G</span>
           </div>
-          <span className="text-xl font-bold text-foreground">HomeHelp</span>
+          <span className="text-xl font-bold text-foreground">GetServed</span>
         </Link>
 
         {/* Desktop Navigation */}

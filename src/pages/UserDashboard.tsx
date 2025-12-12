@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { usePaystack } from "@/hooks/usePaystack";
+import { PaymentHistory } from "@/components/dashboard/PaymentHistory";
 import { toast } from "sonner";
 
 // Mock bookings data (will be replaced with real data when auth is connected)
@@ -213,7 +214,7 @@ export default function UserDashboard() {
               </TabsTrigger>
               <TabsTrigger value="payments" className="gap-2">
                 <CreditCard className="h-4 w-4" />
-                Payments
+                Payment History
               </TabsTrigger>
               <TabsTrigger value="settings" className="gap-2">
                 <Settings className="h-4 w-4" />
@@ -439,32 +440,7 @@ export default function UserDashboard() {
             </TabsContent>
 
             <TabsContent value="payments">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Payment History</CardTitle>
-                  <CardDescription>
-                    View your payment history and transaction details
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {bookings.filter(b => b.payment_status !== "pending").map((booking) => (
-                      <div key={booking.id} className="flex items-center justify-between border-b border-border pb-4">
-                        <div>
-                          <p className="font-medium">{booking.provider.service}</p>
-                          <p className="text-sm text-muted-foreground">{booking.date}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold">${booking.price}</p>
-                          <Badge variant={paymentStatusColors[booking.payment_status as keyof typeof paymentStatusColors] || "secondary"}>
-                            {booking.payment_status}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+              <PaymentHistory />
             </TabsContent>
 
             <TabsContent value="settings">

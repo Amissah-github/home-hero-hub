@@ -87,6 +87,42 @@ serve(async (req: Request) => {
       throw updateError;
     }
 
+    // Fetch customer details for email
+    const { data: customerProfile } = await supabaseClient
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", booking.customer_id)
+      .single();
+
+    const { data: category } = await supabaseClient
+      .from("service_categories")
+      .select("name")
+      .eq("id", booking.category_id)
+      .single();
+
+    // Send refund email to customer
+    if (customerProfile?.email) {
+      const emailPayload = {
+        to: customerProfile.email,
+        type: "refund_processed",
+        data: {
+          customerName: customerProfile.full_name,
+          serviceName: category?.name,
+          amount: totalAmount,
+          refundAmount: refundAmount,
+        },
+      };
+
+      fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-payment-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+        },
+        body: JSON.stringify(emailPayload),
+      }).catch(console.error);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
