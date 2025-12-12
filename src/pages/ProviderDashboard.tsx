@@ -22,6 +22,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { usePaystack } from "@/hooks/usePaystack";
+import { ProviderEarnings } from "@/components/dashboard/ProviderEarnings";
 
 // Mock jobs data
 const mockJobs = [
@@ -482,52 +483,7 @@ export default function ProviderDashboard() {
             </TabsContent>
 
             <TabsContent value="earnings">
-              <div className="grid gap-6 lg:grid-cols-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Earnings Summary</CardTitle>
-                    <CardDescription>Your earnings after platform fee (10%)</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">This Week</span>
-                      <span className="text-2xl font-bold">${weeklyEarnings}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">This Month</span>
-                      <span className="text-2xl font-bold">${monthlyEarnings}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Total Jobs</span>
-                      <span className="text-2xl font-bold">{totalJobs}</span>
-                    </div>
-                    <div className="border-t border-border pt-4">
-                      <p className="text-sm text-muted-foreground mb-2">
-                        You receive 90% of each booking. Payments are released after both you and the customer mark the job complete.
-                      </p>
-                      <Button className="w-full">View Full Report</Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Payment Settings</CardTitle>
-                    <CardDescription>
-                      Manage how you receive payments
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground">
-                      Connect a bank account to receive earnings. Payments are
-                      processed automatically after both parties confirm job completion.
-                    </p>
-                    <Button variant="outline" className="mt-4 w-full">
-                      Add Bank Account
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
+              <ProviderEarnings />
             </TabsContent>
 
             <TabsContent value="profile">
