@@ -63,6 +63,80 @@ serve(async (req: Request) => {
         throw updateError;
       }
 
+      // Fetch booking details for email
+      const { data: booking } = await supabaseClient
+        .from("bookings")
+        .select(`
+          total_amount,
+          scheduled_date,
+          scheduled_time,
+          customer_id,
+          provider_id
+        `)
+        .eq("id", bookingId)
+        .single();
+
+      if (booking) {
+        // Fetch provider info
+        const { data: provider } = await supabaseClient
+          .from("providers")
+          .select("user_id")
+          .eq("id", booking.provider_id)
+          .single();
+
+        const { data: providerProfile } = await supabaseClient
+          .from("profiles")
+          .select("full_name")
+          .eq("id", provider?.user_id)
+          .single();
+
+        // Fetch service category
+        const { data: bookingWithCategory } = await supabaseClient
+          .from("bookings")
+          .select("category_id")
+          .eq("id", bookingId)
+          .single();
+
+        const { data: category } = await supabaseClient
+          .from("service_categories")
+          .select("name")
+          .eq("id", bookingWithCategory?.category_id)
+          .single();
+
+        // Fetch customer email
+        const { data: customerProfile } = await supabaseClient
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", booking.customer_id)
+          .single();
+
+        // Send payment confirmation email
+        if (customerProfile?.email) {
+          const emailPayload = {
+            to: customerProfile.email,
+            type: "payment_confirmed",
+            data: {
+              customerName: customerProfile.full_name,
+              providerName: providerProfile?.full_name,
+              serviceName: category?.name,
+              amount: booking.total_amount,
+              bookingDate: booking.scheduled_date,
+              bookingTime: booking.scheduled_time,
+            },
+          };
+
+          // Fire and forget - don't block payment verification
+          fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-payment-email`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            },
+            body: JSON.stringify(emailPayload),
+          }).catch(console.error);
+        }
+      }
+
       return new Response(
         JSON.stringify({
           success: true,

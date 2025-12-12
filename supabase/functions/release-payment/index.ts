@@ -106,6 +106,48 @@ serve(async (req: Request) => {
       throw updateError;
     }
 
+    // Fetch details for email
+    const { data: providerProfile } = await supabaseClient
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", booking.provider?.user_id)
+      .single();
+
+    const { data: customerProfile } = await supabaseClient
+      .from("profiles")
+      .select("full_name")
+      .eq("id", booking.customer_id)
+      .single();
+
+    const { data: category } = await supabaseClient
+      .from("service_categories")
+      .select("name")
+      .eq("id", booking.category_id)
+      .single();
+
+    // Send payment released email to provider
+    if (providerProfile?.email) {
+      const emailPayload = {
+        to: providerProfile.email,
+        type: "payment_released",
+        data: {
+          providerName: providerProfile.full_name,
+          customerName: customerProfile?.full_name,
+          serviceName: category?.name,
+          amount: providerAmount / 100,
+        },
+      };
+
+      fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-payment-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+        },
+        body: JSON.stringify(emailPayload),
+      }).catch(console.error);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

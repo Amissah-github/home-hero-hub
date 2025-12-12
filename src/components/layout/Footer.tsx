@@ -43,9 +43,9 @@ export function Footer() {
           <div className="lg:col-span-1">
             <Link to="/" className="flex items-center gap-2">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg gradient-primary">
-                <Home className="h-5 w-5 text-primary-foreground" />
+                <span className="text-lg font-bold text-primary-foreground">G</span>
               </div>
-              <span className="text-xl font-bold text-foreground">HomeHelp</span>
+              <span className="text-xl font-bold text-foreground">GetServed</span>
             </Link>
             <p className="mt-4 text-sm text-muted-foreground">
               Connect with verified home service providers in your area. Quality service, guaranteed.
@@ -130,7 +130,7 @@ export function Footer() {
         </div>
 
         <div className="mt-12 border-t border-border pt-8 text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} HomeHelp. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} GetServed. All rights reserved.</p>
         </div>
       </div>
     </footer>

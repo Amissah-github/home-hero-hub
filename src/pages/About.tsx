@@ -8,7 +8,7 @@ export default function About() {
       <Navbar />
       <main className="container px-4 py-16">
         <div className="mx-auto max-w-4xl">
-          <h1 className="text-4xl font-bold text-foreground mb-6">About HomeHelp</h1>
+          <h1 className="text-4xl font-bold text-foreground mb-6">About GetServed</h1>
           <p className="text-lg text-muted-foreground mb-12">
             We're on a mission to connect homeowners with trusted, verified service providers, 
             making home maintenance and care accessible to everyone.
@@ -53,7 +53,7 @@ export default function About() {
             <h2 className="text-2xl font-bold text-foreground mb-4">Join Our Community</h2>
             <p className="text-muted-foreground mb-6">
               Whether you're looking for reliable home services or want to grow your service business, 
-              HomeHelp is here for you.
+              GetServed is here for you.
             </p>
           </div>
         </div>
