@@ -2,7 +2,11 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+// TODO: Add RESEND_API_KEY to your backend secrets to enable email sending
+// Get your API key from: https://resend.com/api-keys
+// Also validate your email domain at: https://resend.com/domains
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +25,18 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Check if Resend is configured
+    if (!resend) {
+      console.log("RESEND_API_KEY not configured - skipping email sending");
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Email service not configured. Add RESEND_API_KEY to secrets." 
+        }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
