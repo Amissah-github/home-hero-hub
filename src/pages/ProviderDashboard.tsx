@@ -20,9 +20,11 @@ import {
   TrendingUp,
   Bell,
   Loader2,
+  Wallet,
 } from "lucide-react";
 import { usePaystack } from "@/hooks/usePaystack";
 import { ProviderEarnings } from "@/components/dashboard/ProviderEarnings";
+import { PayoutSettings } from "@/components/dashboard/PayoutSettings";
 
 // Mock jobs data
 const mockJobs = [
@@ -229,6 +231,10 @@ export default function ProviderDashboard() {
               <TabsTrigger value="earnings" className="gap-2">
                 <TrendingUp className="h-4 w-4" />
                 Earnings
+              </TabsTrigger>
+              <TabsTrigger value="payouts" className="gap-2">
+                <Wallet className="h-4 w-4" />
+                Payouts
               </TabsTrigger>
               <TabsTrigger value="profile" className="gap-2">
                 <User className="h-4 w-4" />
@@ -484,6 +490,10 @@ export default function ProviderDashboard() {
 
             <TabsContent value="earnings">
               <ProviderEarnings />
+            </TabsContent>
+
+            <TabsContent value="payouts">
+              <PayoutSettings />
             </TabsContent>
 
             <TabsContent value="profile">
