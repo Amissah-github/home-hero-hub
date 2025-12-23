@@ -25,6 +25,7 @@ import Contact from "./pages/Contact";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Cookies from "./pages/Cookies";
+import LiveTracking from "./pages/LiveTracking";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,7 @@ const App = () => (
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/cookies" element={<Cookies />} />
+          <Route path="/tracking/:bookingId" element={<LiveTracking />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
